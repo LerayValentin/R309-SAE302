@@ -2,7 +2,7 @@ import socket
 
 client_connected = True
 serveur = socket.socket()
-serveur.bind(('localhost', 2000))
+serveur.bind(('0.0.0.0', 2000))
 serveur.listen(1)
 
 while True:

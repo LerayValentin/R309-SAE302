@@ -29,7 +29,7 @@ def gerer_client(conn, addr):
     print(f"Connexion fermee avec {addr}")
 
 serveur = socket.socket()
-serveur.bind(('localhost', 2000))
+serveur.bind(('0.0.0.0', 2000))
 serveur.listen(5)
 
 print("en attente de connexion...")
