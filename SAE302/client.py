@@ -1,8 +1,6 @@
-import sys
+import socket, threading, sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QGridLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFileDialog
 from PyQt6.QtCore import QCoreApplication
-import socket
-import threading
 
 client_connected = False
 
@@ -43,9 +41,9 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.bouton_envoyer_fichier, 3, 2, 1, 2)
         grid.addWidget(self.text_editor, 5, 0, 2, 2)
         grid.addWidget(self.affichage, 5, 2, 2, 2)
-        #grid.addWidget(self.quit, 7, 0, 1, 4)
+        grid.addWidget(self.quit, 7, 0, 1, 4)
 
-        #self.quit.clicked.connect(self.__quitter)
+        self.quit.clicked.connect(self.__quitter)
         self.bouton_connexion.clicked.connect(self.__connect)
         self.bouton_ouvrir.clicked.connect(self.__ouvrir_fichier)
         self.bouton_envoyer_fichier.clicked.connect(self.__envoyer_fichier)
@@ -57,11 +55,7 @@ class MainWindow(QMainWindow):
     def __connect(self):
         global client_connected, client, addresse_serveur, port
         if client_connected:
-            client.close()
-            client_connected = False
-            self.bouton_connexion.setText("Se connecter au serveur")
-            self.label_connected.setText('Déconnecté du serveur')
-            self.setStyleSheet('QLabel#label_connected{color: red;}')
+            self.__deconnecter()
         else:
             try:
                 addresse_serveur = self.input_serveur.text()
@@ -82,9 +76,13 @@ class MainWindow(QMainWindow):
         while client_connected:
             try:
                 message = client.recv(1024).decode()
+                if not message:
+                    break
                 self.affichage.append(message)
             except Exception:
                 break
+        self.__deconnecter(erreur=True)
+
 
     def __ouvrir_fichier(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Ouvrir un fichier", "", "Source Files (*.py *.c *.java);;All Files (*)")
@@ -108,14 +106,28 @@ class MainWindow(QMainWindow):
         else:
             self.label_connected.setText("Connectez-vous d'abord au serveur.")
 
+    def __deconnecter(self, erreur=False):
+        global client_connected, client
+        if client_connected:
+            try:
+                client.close()
+            except Exception:
+                pass
+            else:
+                client_connected = False
+                self.label_connected.setText("Deconnecte du serveur")
+                self.setStyleSheet('QLabel#label_connected{color: red;}')
+                self.bouton_connexion.setText("Se connecter au serveur")
+
+
+    def __quitter(self):
+        self.__deconnecter()
+        QCoreApplication.exit(0)
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
     
-"""
-    def __quitter(self):
-        client.close()
-        QCoreApplication.exit(0)
-"""

@@ -1,0 +1,4 @@
+sudo apt install python3 git gcc default-jdk
+git clone https://github.com/LerayValentin/R309-SAE302.git
+
+installer g++ et gcc
