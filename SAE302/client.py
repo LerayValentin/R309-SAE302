@@ -101,8 +101,11 @@ class MainWindow(QMainWindow):
 
     def __envoyer_fichier(self):
         if client_connected:
-            contenu = self.text_editor.toPlainText()
-            client.send(contenu.encode())
+            try:
+                contenu = self.text_editor.toPlainText()
+                client.send(contenu.encode())
+            except Exception as e:
+                self.affichage.append(f"Erreur d'envoi : {e}")
         else:
             self.label_connected.setText("Connectez-vous d'abord au serveur.")
 
