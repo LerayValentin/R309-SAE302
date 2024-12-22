@@ -1,8 +1,7 @@
-import socket
-import threading
-import argparse
+import socket, threading, argparse
 
 esclaves_actifs = []
+charge_esclaves = {}
 clients_connectes = {}
 lock = threading.Lock()
 
@@ -14,7 +13,8 @@ def gerer_client(conn, addr):
             if not script:
                 break
             result = redistribuer_script(script, addr[1])
-            conn.send(result.encode())
+            if result != "Script envoyé à l'esclave.":
+                conn.send(result.encode())
         except Exception as e:
             print(f"Erreur avec le client {addr}: {e}")
             break
@@ -23,20 +23,24 @@ def gerer_client(conn, addr):
         clients_connectes.pop(addr[1], None)
 
 def redistribuer_script(script, client_port):
-    if not esclaves_actifs:
-        return "Erreur : Aucun esclave disponible."
-
-    for esclave_conn, esclave_addr in esclaves_actifs[:]:
+    with lock:
+        esclaves_disponibles = [
+            (conn, addr) for conn, addr in esclaves_actifs if charge_esclaves.get(addr, 0) < nbr_prog_max
+        ]
+        if not esclaves_disponibles:
+            return "Erreur : Aucun esclave disponible pour executer le script."
+        esclave_conn, esclave_addr = esclaves_disponibles[0]
         try:
             message = f"{client_port}:{script}"
             esclave_conn.sendall(message.encode())
-            return f"Script envoyé à l'esclave {esclave_addr}"
+            charge_esclaves[esclave_addr] = charge_esclaves.get(esclave_addr, 0) + 1
+            return "Script envoyé à l'esclave."
         except Exception as e:
             print(f"Erreur avec l'esclave {esclave_addr}: {e}")
-            with lock:
-                esclaves_actifs.remove((esclave_conn, esclave_addr))
-                esclave_conn.close()
-    return "Erreur : Aucun esclave n'a répondu."
+            esclaves_actifs.remove((esclave_conn, esclave_addr))
+            charge_esclaves.pop(esclave_addr, None)
+            esclave_conn.close()
+            return redistribuer_script(script, client_port)
 
 def ecouter_esclave(esclave_conn, esclave_addr):
     while True:
@@ -44,18 +48,19 @@ def ecouter_esclave(esclave_conn, esclave_addr):
             reponse = esclave_conn.recv(1024).decode()
             if not reponse:
                 break
-
             client_port, resultat = reponse.split(":", 1)
             with lock:
                 client_conn = clients_connectes.get(int(client_port))
                 if client_conn:
                     client_conn.send(resultat.encode())
+                if charge_esclaves.get(esclave_addr, 0) > 0:
+                    charge_esclaves[esclave_addr] -= 1
         except Exception as e:
             print(f"Erreur de réception avec l'esclave {esclave_addr}: {e}")
             break
-
     with lock:
         esclaves_actifs.remove((esclave_conn, esclave_addr))
+        charge_esclaves.pop(esclave_addr, None)
     esclave_conn.close()
     print(f"Esclave {esclave_addr} déconnecté.")
 
@@ -65,6 +70,7 @@ def accepter_slave():
             slave_conn, slave_addr = serveur_esclaves.accept()
             with lock:
                 esclaves_actifs.append((slave_conn, slave_addr))
+                charge_esclaves[slave_addr] = 0
             print(f"Esclave connecté depuis {slave_addr}. Total : {len(esclaves_actifs)}")
             threading.Thread(target=ecouter_esclave, args=(slave_conn, slave_addr)).start()
         except Exception as e:
@@ -73,12 +79,14 @@ def accepter_slave():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Serveur maître pour clients et esclaves.")
-    parser.add_argument("--pc", type=int, default=4200, help="Port pour les connexions clients (par défaut : 4200).")
+    parser.add_argument("--pc", type=int, default=4200, help="Port pour les connexions clients (par defaut : 4200).")
     parser.add_argument("--pe", type=int, default=4300, help="Port pour les connexions esclaves (par défaut : 4300).")
+    parser.add_argument("--nbr_p", type=int, default=2, help="Nombre maximum de programmes simultanes par serveur esclave")
     args = parser.parse_args()
 
     serveur_clients = socket.socket()
     serveur_esclaves = socket.socket()
+    nbr_prog_max = args.nbr_p
 
     try:
         serveur_esclaves.bind(('0.0.0.0', args.pe))
