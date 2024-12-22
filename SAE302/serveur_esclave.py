@@ -1,43 +1,36 @@
 import socket
 import threading
-import os
 import subprocess
-import argparse
-from queue import Queue
+import argparse, os
 
 etat_slave = True
-queue = Queue()
 
 def reception_code():
     global etat_slave
-    print(f"Connexion établie avec le master.")
+    print("Connexion établie avec le master.")
     while etat_slave:
         try:
-            script = slave.recv(1024).decode()
-            if not script:
-                print(f"Master déconnecté.")
-                etat_slave = False
+            message = slave.recv(1024).decode()
+            if not message:
+                print("Master déconnecté ou message vide reçu.")
                 break
-            queue.put(script)
-        except ConnectionResetError:
-            print(f"Connexion perdue avec le master.")
-            etat_slave = False
+            client_port, script = message.split(":", 1)
+            threading.Thread(target=traiter_script, args=(script, client_port)).start()
+        except (ConnectionResetError):
+            print("Connexion perdue avec le master")
+            break
         except Exception as e:
             print(f"Erreur avec le master : {e}")
-            etat_slave = False
+            break
     slave.close()
-    print(f"Connexion fermée avec le master.")
+    print("Connexion fermée avec le master.")
 
-def traiter_script():
-    while etat_slave:
-        if not queue.empty():
-            script = queue.get()
-            print(f"Traitement du script : {script}")
-            resultat = choix_language(script)
-            print(resultat)
-            slave.send(resultat.encode())
-            print(f"Resultat renvoyé au master")
-            queue.task_done()
+def traiter_script(script, client_port):
+    print(f"Traitement du script : {script} (Client Port: {client_port})")
+    resultat = choix_language(script)
+    result_with_port = f"{client_port}:\n{resultat}"
+    slave.send(result_with_port.encode())
+    print("Résultat renvoyé au master")
 
 def choix_language(script):
     if script.startswith("#python"):
@@ -51,79 +44,59 @@ def choix_language(script):
 
 def execute_python(script):
     try:
-        process = subprocess.Popen(["python3", "-c", script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, stderr = process.communicate()
+        process = subprocess.run(["python3", "-c", script], capture_output=True, text=True)
+        return process.stdout if process.returncode == 0 else f"Erreur Python : {process.stderr}"
     except Exception as e:
         return f"Erreur : {e}"
-    else:
-        if process.returncode != 0:
-            return f"Erreur Python : {stderr}"
-        else:
-            return stdout
 
 def execute_c(script):
     try:
         with open("temp.c", "w") as f:
             f.write(script)
-        compile_result = subprocess.run(["gcc", "temp.c", "-o", "temp"], stderr=subprocess.PIPE, text=True)
+        compile_result = subprocess.run(["gcc", "temp.c", "-o", "temp"], capture_output=True, text=True)
         if compile_result.returncode != 0:
             return f"Erreur de compilation C : {compile_result.stderr}"
-        exec_result = subprocess.run(["./temp"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        os.remove("temp.c")
-        os.remove("temp")
+        exec_result = subprocess.run(["./temp"], capture_output=True, text=True)
+        return exec_result.stdout if exec_result.returncode == 0 else f"Erreur à l'exécution C : {exec_result.stderr}"
     except Exception as e:
         return f"Erreur lors de l'exécution C : {e}"
-    else:
-        if exec_result.returncode != 0:
-            return f"Erreur à l'exécution C : {exec_result.stderr}"
-        else:
-            return exec_result.stdout
+    finally:
+        for file in ["temp.c", "temp"]:
+            try:
+                os.remove(file)
+            except FileNotFoundError:
+                pass
 
 def execute_java(script):
     try:
         with open("Temp.java", "w") as f:
             f.write(script)
-        compile_result = subprocess.run(["javac", "Temp.java"], stderr=subprocess.PIPE, text=True)
+        compile_result = subprocess.run(["javac", "Temp.java"], capture_output=True, text=True)
         if compile_result.returncode != 0:
             return f"Erreur de compilation Java : {compile_result.stderr}"
-        exec_result = subprocess.run(["java", "Temp"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        os.remove("Temp.java")
-        os.remove("Temp.class")
+        exec_result = subprocess.run(["java", "Temp"], capture_output=True, text=True)
+        return exec_result.stdout if exec_result.returncode == 0 else f"Erreur à l'exécution Java : {exec_result.stderr}"
     except Exception as e:
         return f"Erreur lors de l'exécution Java : {e}"
-    else:
-        if exec_result.returncode != 0:
-            return f"Erreur à l'exécution Java : {exec_result.stderr}"
-        else:
-            return exec_result.stdout
+    finally:
+        for file in ["Temp.java", "Temp.class"]:
+            try:
+                os.remove(file)
+            except FileNotFoundError:
+                pass
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Serveur esclave qui exécute le code envoyé par le serveur maître")
-    parser.add_argument("--ip_m", type=str, default='127.0.0.1', help="Adresse IP du serveur maître (au format X.X.X.X).")
-    parser.add_argument("--pm", type=int, default=4300, help="Port utilisé pour la connexion au master (par défaut : 4300).")
+    parser.add_argument("--ip_m", type=str, default='127.0.0.1', help="Adresse IP du serveur maître.")
+    parser.add_argument("--pm", type=int, default=4300, help="Port utilisé pour la connexion au master.")
     args = parser.parse_args()
 
-    addresse_master = args.ip_m
-    port_master = args.pm
-
     slave = socket.socket()
-    print("En attente de connexion...")
-    while etat_slave:
-        try:
-            slave.connect((addresse_master, port_master))
-            print(f"Connecté au master.")
-            thread_reception = threading.Thread(target=reception_code)
-            thread_reception.start()
-            thread_traitement = threading.Thread(target=traiter_script)
-            thread_traitement.start()
-            thread_reception.join()
-            thread_traitement.join()
-        except KeyboardInterrupt:
-            print("\nArrêt du serveur...")
-            etat_slave = False
-        except OSError as e:
-            print(f"Erreur de connexion au master : {e}")
-            etat_slave = False
-        finally:
-            if slave:
-                slave.close()
+    try:
+        slave.connect((args.ip_m, args.pm))
+        print("Connecté au master.")
+        reception_code()
+    except (KeyboardInterrupt, OSError) as e:
+        print(f"Arrêt ou erreur : {e}")
+    finally:
+        slave.close()

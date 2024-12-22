@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
         self.bouton_ouvrir = QPushButton('Ouvrir fichier')
         self.bouton_envoyer_fichier = QPushButton('Envoyer fichier')
         self.affichage = QTextEdit('')
-        self.affichage.setEnabled(False)
+        self.affichage.setReadOnly(True)
         self.quit = QPushButton("Quitter")
 
         grid.addWidget(label_serveur, 0, 0)
@@ -51,7 +51,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Client Graphique")
         self.resize(400, 400)
 
-
     def __connect(self):
         global client_connected, client, addresse_serveur, port
         if client_connected:
@@ -67,7 +66,6 @@ class MainWindow(QMainWindow):
             else:
                 client_connected = True
                 self.label_connected.setText('Connecté au serveur')
-                self.setStyleSheet('QLabel#label_connected{color: green;}')
                 self.bouton_connexion.setText("Se déconnecter du serveur")
                 thread_reception = threading.Thread(target=self.__recevoir_messages)
                 thread_reception.start()
@@ -82,7 +80,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 break
         self.__deconnecter(erreur=True)
-
 
     def __ouvrir_fichier(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Ouvrir un fichier", "", "Source Files (*.py *.c *.java);;All Files (*)")
@@ -119,18 +116,14 @@ class MainWindow(QMainWindow):
             else:
                 client_connected = False
                 self.label_connected.setText("Deconnecte du serveur")
-                self.setStyleSheet('QLabel#label_connected{color: red;}')
                 self.bouton_connexion.setText("Se connecter au serveur")
-
 
     def __quitter(self):
         self.__deconnecter()
         QCoreApplication.exit(0)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
-    
