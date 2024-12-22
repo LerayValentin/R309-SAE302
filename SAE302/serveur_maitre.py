@@ -1,61 +1,42 @@
-import socket
-import threading
+import socket, threading, argparse
 
-etat_serveur = True
 esclaves_actifs = []
 
 def gerer_client(conn, addr):
-    global etat_serveur
     print(f"Client connecté : {addr}")
-    while etat_serveur:
+    while True:
         try:
             script = conn.recv(1024).decode()
             if not script:
                 print(f"Client {addr} déconnecté.")
-                etat_serveur = False
+                break
             result = redistribuer_script(script)
             conn.send(result.encode())
         except ConnectionResetError:
             print(f"Connexion perdue avec {addr}.")
-            etat_serveur = False
+            break
         except Exception as e:
             print(f"Erreur avec le client {addr}: {e}")
-            etat_serveur = False
+            break
     conn.close()
     print(f"Connexion fermée avec {addr}")
-
-def gerer_esclave(conn, addr):
-    global etat_serveur
-    print(f"Esclave connecté : {addr}")
-    esclaves_actifs.append((conn, addr))
-    try:
-        while etat_serveur:
-            message = conn.recv(1024).decode()
-            if not message:
-                print(f"Esclave déconnecté : {addr}")
-                break
-    except Exception as e:
-        print(f"Erreur avec l'esclave {addr}: {e}")
-    finally:
-        esclaves_actifs.remove((conn, addr))
-        conn.close()
 
 def redistribuer_script(script):
     if not esclaves_actifs:
         return "Erreur : Aucun esclave disponible."
-    for esclave_conn, esclave_addr in esclaves_actifs:
+    for esclave_conn, esclave_addr in esclaves_actifs[:]:
         try:
-            print("envoi au slave...")
+            print("Envoi au slave...")
             esclave_conn.sendall(script.encode())
             reponse = esclave_conn.recv(1024).decode()
-            print(f"réponse : {reponse}")
+            print(f"Réponse : {reponse}")
             if reponse:
                 return reponse
         except Exception as e:
             print(f"Erreur avec l'esclave {esclave_addr}: {e}")
+            esclaves_actifs.remove((esclave_conn, esclave_addr))
             continue
     return "Erreur : Aucun esclave n'a répondu."
-
 
 def accepter_slave():
     print("En attente de nouveaux esclaves...")
@@ -68,11 +49,14 @@ def accepter_slave():
             print(f"Erreur lors de l'acceptation d'un esclave : {e}")
             break
 
-
-
 if __name__ == "__main__":
-    PORT_CLIENTS = 4200  # Port pour les clients
-    PORT_ESCLAVES = 4301  # Port pour les esclaves
+    parser = argparse.ArgumentParser(description="Serveur maître pour clients et esclaves.")
+    parser.add_argument("--pc",type=int,default=4200,help="Port utilisé pour les connexions clients (par défaut : 4200).")
+    parser.add_argument("--pe",type=int,default=4300,help="Port utilisé pour les connexions esclaves (par défaut : 4301).")
+    args = parser.parse_args()
+
+    PORT_CLIENTS = args.pc
+    PORT_ESCLAVES = args.pe
 
     serveur_clients = socket.socket()
     serveur_esclaves = socket.socket()
@@ -81,13 +65,13 @@ if __name__ == "__main__":
         serveur_esclaves.bind(('0.0.0.0', PORT_ESCLAVES))
         serveur_esclaves.listen(5)
         print(f"Serveur maître (esclaves) en attente sur le port {PORT_ESCLAVES}...")
-        thread_esclaves = threading.Thread(target=accepter_esclaves)
+        thread_esclaves = threading.Thread(target=accepter_slave)
         thread_esclaves.start()
 
         serveur_clients.bind(('0.0.0.0', PORT_CLIENTS))
         serveur_clients.listen(5)
         print(f"Serveur maître (clients) en attente sur le port {PORT_CLIENTS}...")
-        while etat_serveur:
+        while True:
             try:
                 conn_client, addr_client = serveur_clients.accept()
                 print(f"Nouveau client connecté : {addr_client}")
@@ -95,7 +79,6 @@ if __name__ == "__main__":
                 thread_client.start()
             except KeyboardInterrupt:
                 print("\nArrêt du serveur...")
-                etat_serveur = False
                 break
 
     except Exception as e:

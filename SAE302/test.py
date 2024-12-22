@@ -1,3 +1,5 @@
+import time
+time.sleep(3)
 print("Test 1")
 print("Test 2")
 def calcul(x, y):

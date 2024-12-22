@@ -49,7 +49,7 @@ class MainWindow(QMainWindow):
         self.bouton_envoyer_fichier.clicked.connect(self.__envoyer_fichier)
 
         self.setWindowTitle("Client Graphique")
-        self.resize(800, 800)
+        self.resize(400, 400)
 
 
     def __connect(self):
