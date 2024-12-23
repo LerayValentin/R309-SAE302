@@ -3,6 +3,7 @@ import socket, threading, argparse
 esclaves_actifs = []
 charge_esclaves = {}
 clients_connectes = {}
+scripts_en_attente = {}
 lock = threading.Lock()
 
 def gerer_client(conn, addr):
@@ -12,6 +13,8 @@ def gerer_client(conn, addr):
             script = conn.recv(1024).decode()
             if not script:
                 break
+            with lock:
+                scripts_en_attente[addr[1]] = script
             result = redistribuer_script(script, addr[1])
             if result != "Script envoyé à l'esclave.":
                 conn.send(result.encode())
@@ -22,25 +25,34 @@ def gerer_client(conn, addr):
     with lock:
         clients_connectes.pop(addr[1], None)
 
-def redistribuer_script(script, client_port):
+def redistribuer_script(script, client_port, esclaves_exclus=None):
+    if esclaves_exclus is None:
+        esclaves_exclus = set()
     with lock:
         esclaves_disponibles = [
-            (conn, addr) for conn, addr in esclaves_actifs if charge_esclaves.get(addr, 0) < nbr_prog_max
+            (conn, addr)
+            for conn, addr in esclaves_actifs
+            if charge_esclaves.get(addr, 0) < nbr_prog_max and addr not in esclaves_exclus
         ]
+        print(f"Esclaves disponibles : {esclaves_disponibles}")
         if not esclaves_disponibles:
             return "Erreur : Aucun esclave disponible pour executer le script."
-        esclave_conn, esclave_addr = esclaves_disponibles[0]
-        try:
-            message = f"{client_port}:{script}"
-            esclave_conn.sendall(message.encode())
-            charge_esclaves[esclave_addr] = charge_esclaves.get(esclave_addr, 0) + 1
-            return "Script envoyé à l'esclave."
-        except Exception as e:
-            print(f"Erreur avec l'esclave {esclave_addr}: {e}")
-            esclaves_actifs.remove((esclave_conn, esclave_addr))
-            charge_esclaves.pop(esclave_addr, None)
-            esclave_conn.close()
-            return redistribuer_script(script, client_port)
+
+        for esclave_conn, esclave_addr in esclaves_disponibles:
+            try:
+                message = f"{client_port}:{script}"
+                print(f"Envoi du script au esclave {esclave_addr} : {message}")
+                esclave_conn.sendall(message.encode())
+                charge_esclaves[esclave_addr] = charge_esclaves.get(esclave_addr, 0) + 1
+                return "Script envoyé à l'esclave."
+            except Exception as e:
+                print(f"Erreur avec l'esclave {esclave_addr}: {e}")
+                esclaves_actifs.remove((esclave_conn, esclave_addr))
+                charge_esclaves.pop(esclave_addr, None)
+                esclave_conn.close()
+                esclaves_exclus.add(esclave_addr)
+
+        return redistribuer_script(script, client_port, esclaves_exclus)
 
 def ecouter_esclave(esclave_conn, esclave_addr):
     while True:
@@ -48,6 +60,13 @@ def ecouter_esclave(esclave_conn, esclave_addr):
             reponse = esclave_conn.recv(1024).decode()
             if not reponse:
                 break
+            if "Erreur: Compilateur manquant" in reponse:
+                client_port, _ = reponse.split(":", 1)
+                print(f"Compilateur manquant sur l'esclave {esclave_addr}. Redistribution du script.")
+                with lock:
+                    script = scripts_en_attente.get(int(client_port), "Script introuvable")
+                    redistribuer_script(script, int(client_port), esclaves_exclus={esclave_addr})
+                continue
             client_port, resultat = reponse.split(":", 1)
             with lock:
                 client_conn = clients_connectes.get(int(client_port))
