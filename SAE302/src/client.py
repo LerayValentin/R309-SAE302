@@ -24,13 +24,17 @@ class MainWindow(QMainWindow):
     """
 
     def __init__(self):
-        """Initialise la fenêtre principale et ses composants."""
+        """
+        Initialise la fenêtre principale et ses composants.
+        """
         super().__init__()
         self.init_ui()
         self.file_path = ""
 
     def init_ui(self):
-        """Configure l'interface utilisateur de la fenêtre principale."""
+        """
+        Configure l'interface utilisateur de la fenêtre principale.
+        """
         widget = QWidget()
         self.setCentralWidget(widget)
         grid = QGridLayout()
@@ -65,19 +69,21 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.quit, 7, 0, 1, 4)
 
         # Connexions des boutons à leurs méthodes
-        self.quit.clicked.connect(self.__quitter)
-        self.bouton_connexion.clicked.connect(self.__connect)
-        self.bouton_ouvrir.clicked.connect(self.__ouvrir_fichier)
-        self.bouton_envoyer_fichier.clicked.connect(self.__envoyer_fichier)
+        self.quit.clicked.connect(self.quitter)
+        self.bouton_connexion.clicked.connect(self.connect)
+        self.bouton_ouvrir.clicked.connect(self.ouvrir_fichier)
+        self.bouton_envoyer_fichier.clicked.connect(self.envoyer_fichier)
 
         self.setWindowTitle("Client Graphique")
         self.resize(400, 400)
 
-    def __connect(self):
-        """Établit ou interrompt la connexion avec le serveur."""
+    def connect(self):
+        """
+        Établit ou interrompt la connexion avec le serveur.
+        """
         global client_connected, client, addresse_serveur, port
         if client_connected:
-            self.__deconnecter()
+            self.deconnecter()
         else:
             try:
                 addresse_serveur = self.input_serveur.text()
@@ -90,11 +96,13 @@ class MainWindow(QMainWindow):
                 client_connected = True
                 self.label_connected.setText('Connecté au serveur')
                 self.bouton_connexion.setText("Se déconnecter du serveur")
-                thread_reception = threading.Thread(target=self.__recevoir_messages)
+                thread_reception = threading.Thread(target=self.recevoir_messages)
                 thread_reception.start()
 
-    def __recevoir_messages(self):
-        """Écoute le messages du serveur pour les afficher."""
+    def recevoir_messages(self):
+        """
+        Écoute le messages du serveur pour les afficher.
+        """
         while client_connected:
             try:
                 message = client.recv(1024).decode()
@@ -103,10 +111,12 @@ class MainWindow(QMainWindow):
                 self.affichage.append(message)
             except Exception:
                 break
-        self.__deconnecter()
+        self.deconnecter()
 
-    def __ouvrir_fichier(self):
-        """Ouvre un fichier source et ajoute un commentaire correspondant au langage de ce dernier."""
+    def ouvrir_fichier(self):
+        """
+        Ouvre un fichier source et ajoute un commentaire correspondant au langage de ce dernier.
+        """
         file_path, _ = QFileDialog.getOpenFileName(self, "Ouvrir un fichier", "", "Source Files (*.py *.c *.java);;All Files (*)")
         if file_path:
             with open(file_path, 'r') as file:
@@ -121,8 +131,10 @@ class MainWindow(QMainWindow):
             contenu_modifie = commentaire + contenu
             self.text_editor.setText(contenu_modifie)
 
-    def __envoyer_fichier(self):
-        """Envoie le contenu du fichier ouvert au serveur."""
+    def envoyer_fichier(self):
+        """
+        Envoie le contenu du fichier ouvert au serveur.
+        """
         if client_connected:
             try:
                 contenu = self.text_editor.toPlainText()
@@ -132,8 +144,10 @@ class MainWindow(QMainWindow):
         else:
             self.label_connected.setText("Connectez-vous d'abord au serveur.")
 
-    def __deconnecter(self):
-        """Déconnecte le client du serveur."""
+    def deconnecter(self):
+        """
+        Déconnecte le client du serveur.
+        """
         global client_connected, client
         if client_connected:
             try:
@@ -145,9 +159,11 @@ class MainWindow(QMainWindow):
                 self.label_connected.setText("Déconnecté du serveur")
                 self.bouton_connexion.setText("Se connecter au serveur")
 
-    def __quitter(self):
-        """Ferme l'application."""
-        self.__deconnecter()
+    def quitter(self):
+        """
+        Ferme l'application.
+        """
+        self.deconnecter()
         QCoreApplication.exit(0)
 
 
