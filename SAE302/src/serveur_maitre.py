@@ -25,19 +25,16 @@ def gerer_client(conn: socket.socket, addr: tuple):
         conn (socket.socket): La connexion socket avec le client.
         addr (tuple): L'adresse (IP, port) du client.
     """
-    global etat_master
     print(f"Client connecté : {addr}")
-    while etat_master:
+    while True:
         try:
             script = conn.recv(16384).decode()
             if not script:
-                etat_master = False
                 break
             result = redistribuer_script(script, addr[1])
             conn.send(result.encode())
         except Exception as e:
             print(f"Erreur avec le client {addr}: {e}")
-            etat_master = False
             break
     conn.close()
     with lock:
@@ -76,16 +73,10 @@ def redistribuer_script(script: str, client_port: int) -> str:
                 if esclaves_actifs[addr].get(compilateur, False) and charge_esclaves.get(addr, 0) < nbr_prog_max
             ]
 
-        if compilateur == None :
-            if not esclaves_disponibles and esclaves_actifs:
-                return f"Erreur : Aucun esclave disponible pour executer ce code python."
-            elif not esclaves_disponibles and not esclaves_actifs:
-                return f"Erreur : Aucun esclave connecté au master."
-        else:
-            if not esclaves_disponibles and esclaves_actifs:
-                return f"Erreur : Aucun esclave disponible ayant le compilateur {compilateur}."
-            elif not esclaves_disponibles and not esclaves_actifs:
-                return f"Erreur : Aucun esclave connecté au master."
+        if not esclaves_disponibles:
+            if esclaves_actifs:
+                return f"Erreur : Aucun esclave disponible pour le compilateur {compilateur or 'python'}."
+            return "Erreur : Aucun esclave connecté au maître."
 
         esclave_addr, esclave_info = esclaves_disponibles[0]
         esclave_conn = esclave_info["conn"]
@@ -110,12 +101,10 @@ def ecouter_esclave(esclave_conn: socket.socket, esclave_addr: tuple):
         esclave_conn (socket.socket): La connexion socket avec l'esclave.
         esclave_addr (tuple): L'adresse (IP, port) de l'esclave.
     """
-    global etat_master
-    while etat_master:
+    while True:
         try:
             reponse = esclave_conn.recv(16384).decode()
             if not reponse:
-                etat_master = False
                 break
             client_port, resultat = reponse.split("§§§", 1)
             with lock:
@@ -126,7 +115,6 @@ def ecouter_esclave(esclave_conn: socket.socket, esclave_addr: tuple):
                     charge_esclaves[esclave_addr] -= 1
         except Exception as e:
             print(f"Erreur avec l'esclave {esclave_addr}: {e}")
-            etat_master = False
             break
     with lock:
         esclaves_actifs.pop(esclave_addr, None)
@@ -140,8 +128,7 @@ def accepter_slave():
     Accepte les connexions des esclaves et les ajoute à la liste des esclaves actifs 
     ainsi que les langages qu'ils sont capables de traiter.
     """
-    global etat_master
-    while etat_master:
+    while True:
         try:
             slave_conn, slave_addr = serveur_esclaves.accept()
             compilateurs = slave_conn.recv(1024).decode()
@@ -154,7 +141,6 @@ def accepter_slave():
             threading.Thread(target=ecouter_esclave, args=(slave_conn, slave_addr)).start()
         except Exception as e:
             print(f"Erreur lors de l'acceptation d'un esclave : {e}")
-            etat_master = False
             break
 
 
@@ -173,8 +159,6 @@ def main():
     global nbr_prog_max
     nbr_prog_max = args.nbr_p
 
-    global etat_master
-
     global serveur_clients, serveur_esclaves
     serveur_clients = socket.socket()
     serveur_esclaves = socket.socket()
@@ -183,13 +167,13 @@ def main():
         serveur_esclaves.bind(('0.0.0.0', args.pe))
         serveur_esclaves.listen()
         print(f"Serveur maître (esclaves) sur le port {args.pe}...")
-        threading.Thread(target=accepter_slave).start()
+        threading.Thread(target=accepter_slave, daemon=True).start()
 
         serveur_clients.bind(('0.0.0.0', args.pc))
         serveur_clients.listen()
         print(f"Serveur maître (clients) sur le port {args.pc}...")
 
-        while etat_master:
+        while True:
             conn_client, addr_client = serveur_clients.accept()
             with lock:
                 clients_connectes[addr_client[1]] = conn_client
