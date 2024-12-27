@@ -6,10 +6,7 @@ pour récupérer un retour d'exécution.
 import socket
 import threading
 import sys
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QGridLayout, QLabel, QLineEdit, QPushButton, 
-    QTextEdit, QFileDialog
-)
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QGridLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFileDialog
 from PyQt6.QtCore import QCoreApplication
 
 client_connected = False
@@ -40,7 +37,7 @@ class MainWindow(QMainWindow):
         grid = QGridLayout()
         widget.setLayout(grid)
 
-        label_serveur = QLabel("Serveur :")
+        label_serveur = QLabel("IP du Serveur :")
         label_port = QLabel("Port :")
         self.label_connected = QLabel('')
         self.label_connected.setObjectName('label_connected')
@@ -49,8 +46,8 @@ class MainWindow(QMainWindow):
         self.input_serveur = QLineEdit('127.0.0.1')
         self.input_port = QLineEdit('4200')
         self.text_editor = QTextEdit('')
-        self.bouton_ouvrir = QPushButton('Ouvrir fichier')
-        self.bouton_envoyer_fichier = QPushButton('Envoyer fichier')
+        self.bouton_ouvrir = QPushButton('Ouvrir un fichier')
+        self.bouton_envoyer_fichier = QPushButton('Envoyer le Programme')
         self.affichage = QTextEdit('')
         self.affichage.setReadOnly(True)
         self.quit = QPushButton("Quitter")

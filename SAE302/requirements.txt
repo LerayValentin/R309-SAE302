@@ -1,9 +1,0 @@
-sudo apt install python3 git gcc default-jdk
-git clone https://github.com/LerayValentin/R309-SAE302.git
-
-installer g++ et gcc
-
-doc reponse : tech utilisee et quelles fonctionalitées
-doc prog : comment est mis en place (sphinx)
-doc utilisateur : explications détaillées pour l installation du projet
-video : pour montrer que le projet fonctionne
