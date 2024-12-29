@@ -4,17 +4,20 @@ Le projet SAE302 est organisé de la manière suivante :
 
 SAE302
 │
-├───README.txt              # Ce fichier
-├───docs                     # Documentation générée avec Sphinx
-│   ├───_build               # Dossier de build de la documentation
-│   │   └───html             # Documentation HTML générée
-│   ├───_static              # Fichiers statiques pour la documentation
-│   ├───_templates           # Templates pour la documentation Sphinx
-│   └───conf.py              # Configuration Sphinx
-└───src                       # Dossier des fichiers sources du projet
-    ├───client.py            # Code source du client graphique
-    ├───serveur_esclave.py   # Code source du serveur esclave
-    └───serveur_maitre.py    # Code source du serveur maître
+├───README.txt                                      # Ce fichier
+├───docs                                            # Documentation générée avec Sphinx
+│   ├───_build                                      # Dossier de build de la documentation
+│   │   └───html                                    # Documentation HTML générée
+│   ├───_static                                     # Fichiers statiques pour la documentation
+│   ├───_templates                                  # Templates pour la documentation Sphinx
+│   └───conf.py                                     # Configuration Sphinx
+├───src                                             # Dossier des fichiers sources du projet
+│   ├───client.py                                   # Code source du client graphique
+│   ├───serveur_esclave.py                          # Code source du serveur esclave
+│   └───serveur_maitre.py                           # Code source du serveur maître
+├───Guide_installation_SAE302_LERAY_Valentin.pdf    # Guide d'installation du projet
+├───Lien_Video_Démostration.txt                     # Fichier texte contenant le lien de la vidéo de démonstration
+└───Rapport_Final_SAE302_LERAY_Valentin.pdf         # Rapport final du projet
 
 # Description des dossiers
 
